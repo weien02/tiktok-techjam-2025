@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  review-analyzer:
+    build: .
+    container_name: review_analyzer
+    # Mount project workspace
+    volumes:
+      - ./workspace:/workspace/
+      - type: bind
+        source: ${HF_CACHE:-$HOME/.cache/huggingface}
+        target: /root/.cache/huggingface
+        consistency: delegated
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    # Enable GPU if available
+    runtime: ${DOCKER_RUNTIME:-nvidia}
+    # Default command opens bash
+    command: /bin/bash
