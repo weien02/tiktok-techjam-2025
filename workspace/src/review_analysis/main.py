@@ -5,54 +5,36 @@ from review_analysis.decision_engine import final_decision
 import pandas as pd
 import os
 
+from review_analysis.data_reader import (
+    load_jsonl_data,
+)
 
-def score_review(review_text, business_description):
-    static_scores = static_analysis(review_text)
-    relevance_label, relevance_conf, inference_scores = inference_analysis(
-        review_text, business_description
-    )
-    violations = final_decision(static_scores, inference_scores)
 
-    return {
-        "review_text": review_text,
-        "business_description": business_description,
-        "relevance": relevance_label,
-        "relevance_confidence": relevance_conf,
-        "violations": violations,
-        "static_scores": static_scores,
-        "inference_scores": inference_scores,
-    }
+def score_review(merged_df):
+    # Get the first row
+    first_row = merged_df.iloc[1]
+    review_text = first_row.get("review", "No review provided")
+    description = first_row.get("description", "No description")
+    category = first_row.get("category", [])
+    business_details = {"description": description, "category": category}
+
+    # Call inference_analysis
+    result = inference_analysis(review_text, business_details)
+
+    print("Inference result:")
+    print(result)
 
 
 def main():
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    json_path = os.path.join(project_root, "data", "sample_data.json")
+    base_path = os.path.join(os.path.dirname(__file__), "../../sampleData/")
+    user_reviews_file = os.path.join(base_path, "user_past_reviews.jsonl")
+    gmap_locations_file = os.path.join(base_path, "unique_gmap_ids.jsonl")
 
-    df = pd.read_json(json_path, lines=True)
-
-    reviews = df.to_dict(orient="records")
-
-    for review in reviews:
-        result = score_review(
-            review_text=review["text"],
-            business_description=review["business_description"],
-        )
-        print(result)
-
-    sample_reviews = [
-        {
-            "review_text": "Buy cheap watches at www.spam.com! Never been there but heard it's good.",
-            "business_description": "Italian restaurant serving pizza and pasta.",
-        },
-        {
-            "review_text": "The pasta was delicious and service was excellent.",
-            "business_description": "Italian restaurant serving pizza and pasta.",
-        },
-    ]
-
-    for r in sample_reviews:
-        result = score_review(r["review_text"], r["business_description"])
-        print(result)
+    user_reviews_df, gmap_locations_df = load_jsonl_data(
+        user_reviews_file, gmap_locations_file
+    )
+    merged_df = pd.merge(user_reviews_df, gmap_locations_df, on="gmap_id", how="inner")
+    score_review(merged_df)
 
 
 if __name__ == "__main__":
