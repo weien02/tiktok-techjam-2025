@@ -2,7 +2,7 @@ import re
 from .config import policy_keywords, policy_scores
 from sentence_transformers import SentenceTransformer, util
 
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 # Precompute keyword embeddings
 policy_embeddings = {
@@ -16,8 +16,29 @@ policy_thresholds = {
     "advertisement": 0.27,
     "non_visitor": 0.27,
     "off_topic": 0.27,
-    "rant": 0.27
 }
+
+
+def length_penalty(review_text, min_length=5, penalty=-0.1):
+    """
+    Penalize reviews shorter than min_length words.
+
+    Args:
+        review_text (str): The review text.
+        min_length (int): Minimum acceptable number of words.
+        penalty (float): Penalty score to apply if review is too short.
+
+    Returns:
+        float: Penalty score (0 if review length is sufficient).
+    """
+    if not review_text:
+        return penalty
+
+    length = len(review_text.strip().split())
+    if length < min_length:
+        return penalty
+    return 0.0
+
 
 def static_analysis(review_text, top_k=3):
     """
@@ -27,6 +48,8 @@ def static_analysis(review_text, top_k=3):
     - Short-text / URL / ALL-CAPS boosting
     - Per-policy dynamic thresholds
     """
+    if not review_text:
+        review_text = "No review provided"
     text = review_text.strip()
     text_lower = text.lower()
     length = len(text.split())
@@ -63,16 +86,13 @@ def static_analysis(review_text, top_k=3):
         elif length > 30:
             threshold *= 1.2
 
-        # Debug
-        print(f"Policy: {policy}, Top{top_k}-Mean: {top_k_mean:.3f}, Max: {max_sim:.3f}, Effective: {effective_sim:.3f}, Threshold: {threshold:.3f}")
-
         if effective_sim >= threshold:
             scores[policy] += policy_scores[policy] * effective_sim  # weighted score
 
     # --- Boost for URLs or ALL-CAPS ---
     if re.search(r"http\S+|www\.\S+", text_lower) or text.isupper():
-        if 'spam' in scores:
-            scores['spam'] += abs(policy_scores.get('spam', 0)) * 0.7  # partial boost
+        if "spam" in scores:
+            scores["spam"] += abs(policy_scores.get("spam", 0)) * 0.7  # partial boost
 
     # --- Ensure minimum policy score ---
     for policy in scores:

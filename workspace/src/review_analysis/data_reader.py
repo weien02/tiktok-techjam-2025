@@ -23,18 +23,6 @@ def load_jsonl_data(user_review_path, gmap_location_path, num_rows=5):
 
     print(f"Loading gmap locations from: {gmap_location_path}")
     df2 = pd.read_json(gmap_location_path, lines=True)
-
-    print("\nUser Review Table Headings:")
-    print(df.columns.tolist())
-
-    print(f"\nFirst {num_rows} rows of user reviews:")
-    print(df.head(num_rows))
-
-    print("\nGMap Location Table Headings:")
-    print(df2.columns.tolist())
-
-    print(f"\nFirst {num_rows} rows of gmap locations:")
-    print(df2.head(num_rows))
     return df, df2
 
 
