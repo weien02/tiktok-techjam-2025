@@ -1,22 +1,33 @@
 policy_keywords = {
     "spam": [
-        "buy now", "click here", "www.", "free voucher", "order now",
-        "subscribe", "limited time offer", "promotion code", "get it today"
+        "buy now", "click here", "www.", "http", "free voucher", "order now",
+        "subscribe", "limited time", "promo code", "get it today", "discount",
+        "cheap", "offer", "click this", "check out", "best price", "low cost",
+        "affordable", "for sale", "limited offer", "click link", "visit website"
     ],
     "advertisement": [
-        "check our page", "follow us", "shop now", "official website",
-        "promo", "special offer", "commercial"
+        "check our", "follow us", "shop now", "official website", "promotion",
+        "special offer", "commercial", "brought to you by", "sponsored",
+        "check out our", "visit our", "our products", "our services",
+        "we offer", "available at", "on sale", "order online"
     ],
     "non_visitor": [
         "never been", "heard about", "not visited", "someone told me",
-        "read online", "saw on internet"
+        "read online", "saw online", "saw pictures", "haven't tried",
+        "never tried", "never eaten", "never used", "didn't actually go",
+        "friends told me", "reviews said", "based on reviews", "from what I heard"
     ],
     "off_topic": [
-        "traffic", "parking", "travel experience", "weather",
-        "location not accessible"
+        "traffic", "parking", "weather", "politics", "government",
+        "unrelated", "not related", "off topic", "different subject",
+        "another topic", "personal story", "my life", "job interview",
+        "work environment", "my dog", "my cat", "my family"
     ],
     "rant": [
-        "hate", "ruined my day", "personal issues", "friend problems"
+        "hate", "ruined", "worst", "terrible", "awful", "disgusting",
+        "never again", "waste of money", "regret", "angry", "mad",
+        "pissed off", "sucks", "bad experience", "poor service",
+        "horrible", "appalling", "disappointing"
     ]
 }
 
