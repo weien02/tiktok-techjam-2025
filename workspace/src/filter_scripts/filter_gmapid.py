@@ -3,13 +3,14 @@ import json
 from pathlib import Path
 
 # ====== CONFIG ======
-in_path = Path("../../sampleData/user_past_reviews.jsonl")    # input json file
-out_path = Path("../../sampleData/unique_gmap_ids.jsonl")    # output path
+reviews_path = Path("../../sampleData/user_past_reviews.jsonl") # file with user reviews + gmap_id
+business_path = Path("../../dataSource/meta-Utah.json") # file with business info
+out_path = Path("../../sampleData/unique_gmap_ids.jsonl")  # output
 # ====================
 
+# Step 1: Collect unique gmap_ids from reviews
 unique_gmap_ids = set()
-
-with in_path.open("r", encoding="utf-8") as fin:
+with reviews_path.open("r", encoding="utf-8") as fin:
     for lineno, line in enumerate(fin, 1):
         line = line.strip()
         if not line:
@@ -17,16 +18,41 @@ with in_path.open("r", encoding="utf-8") as fin:
         try:
             record = json.loads(line)
         except json.JSONDecodeError as e:
-            print(f"Skipping line {lineno}: JSON decode error -> {e}")
+            print(f"Skipping review line {lineno}: JSON decode error -> {e}")
             continue
 
-        gmap_id = record.get("gmap_id")
-        if gmap_id:
-            unique_gmap_ids.add(gmap_id)
+        gid = record.get("gmap_id")
+        if gid:
+            unique_gmap_ids.add(gid)
 
-# Write results (one gmap_id per line as JSON)
+print(f"Found {len(unique_gmap_ids)} unique gmap_ids from reviews.")
+
+# Step 2: Filter business_data.jsonl for matching gmap_ids
+filtered_records = []
+with business_path.open("r", encoding="utf-8") as fin:
+    for lineno, line in enumerate(fin, 1):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            biz = json.loads(line)
+        except json.JSONDecodeError as e:
+            print(f"Skipping business line {lineno}: JSON decode error -> {e}")
+            continue
+
+        gid = biz.get("gmap_id")
+        if gid in unique_gmap_ids:
+            filtered_records.append({
+                "gmap_id": gid,
+                "name": biz.get("name"),
+                "address": biz.get("address"),
+                "description": biz.get("description"),
+                "category": biz.get("category"),
+            })
+
+# Step 3: Write output JSONL
 with out_path.open("w", encoding="utf-8") as fout:
-    for gid in sorted(unique_gmap_ids):
-        fout.write(json.dumps({"gmap_id": gid}, ensure_ascii=False) + "\n")
+    for rec in filtered_records:
+        fout.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
-print(f"Extracted {len(unique_gmap_ids)} unique gmap_ids → {out_path}")
+print(f"Wrote {len(filtered_records)} filtered business records → {out_path}")
