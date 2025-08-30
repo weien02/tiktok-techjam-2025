@@ -1,110 +1,150 @@
-from review_analysis.static_analysis import static_analysis
-from review_analysis.inference_analysis import inference_analysis
+from review_analysis.static_analysis import static_analysis, length_penalty
+from review_analysis.inference_analysis import (
+    inference_analysis,
+    user_trustworthiness_analysis,
+)
 from review_analysis.decision_engine import final_decision
 
 import pandas as pd
 import os
 
+from review_analysis.data_reader import (
+    load_jsonl_data,
+)
+from data_conversion_script.data_conversion import Review
 
-def score_review(review_text, business_description):
+
+def apply_inference_analysis(
+    merge_df,
+    review_obj,
+    review_text,
+    business_description,
+    initial_score=5.0,
+    penalty_per_violation=0.2,
+):
+    inference_result = inference_analysis(review_text, business_description)
+    inference_violations = inference_result["filtered_labels"]
+    inference_scores = inference_result["filtered_scores"]
+
+    review_obj.inference_scores = inference_scores
+
+    filtered_violations = [v for v in inference_violations if v != "genuine"]
+    is_genuine = "genuine" in inference_violations
+
+    review_obj.violations.extend(filtered_violations)
+
+    score = initial_score
+    score -= penalty_per_violation * len(filtered_violations)
+    if is_genuine:
+        score += penalty_per_violation  # reward for being genuine
+
+    return max(score, 0)
+
+
+def apply_static_analysis(review_obj, review_text, threshold=0.3):
     static_scores = static_analysis(review_text)
-    relevance_label, relevance_conf, inference_scores = inference_analysis(
-        review_text, business_description
-    )
-    violations = final_decision(static_scores, inference_scores)
 
-    return {
-        "review_text": review_text,
-        "business_description": business_description,
-        "relevance": relevance_label,
-        "relevance_confidence": relevance_conf,
-        "violations": violations,
-        "static_scores": static_scores,
-        "inference_scores": inference_scores,
-    }
+    for policy, score in static_scores.items():
+        if abs(score) >= threshold:
+            if policy not in review_obj.violations:
+                review_obj.violations.append(policy)
+            review_obj.score += score
+    penalty = length_penalty(review_text)
+    if penalty < 0:
+        review_obj.violations.append("short_review")
+        review_obj.score += penalty
+
+    review_obj.static_scores = static_scores
+
+
+def run_review_pipeline(
+    merged_df,
+    max_reviews=20,
+    initial_score=5,
+    penalty_per_violation=1,
+    final_threshold=3,
+):
+    all_review_objects = []
+
+    user_groups = merged_df.groupby("user_id")
+
+    users_processed = 0
+
+    for user_id, user_df in user_groups:
+        users_processed += 1
+        if users_processed > max_reviews:
+            break
+
+        user_reviews = user_df["review"].dropna().tolist()
+
+        user_trust_result = user_trustworthiness_analysis(user_id, user_reviews)
+        is_trustworthy = "trustworthy" in user_trust_result["filtered_labels"]
+        for idx, row in user_df.iterrows():
+            review_text = row.get("review", "No review provided")
+            description = row.get("description", "No description")
+            category = row.get("category", [])
+            business_description = f"{description} | Categories: {', '.join(category)}"
+            if not review_text:
+                review_obj = Review(
+                    review_text="No review provided",
+                    business=business_description,
+                    violations=["no_review_text"],
+                    static_scores={},
+                    inference_scores={},
+                    final_verdict=True,
+                    score=2,
+                )
+                all_review_objects.append(review_obj)
+                print(
+                    f"\n--- Review {idx + 1} (User: {user_id}) [Skipped: No Review] ---\n{review_obj}"
+                )
+                continue
+
+            review_obj = Review(
+                review_text=review_text,
+                business=business_description,
+                violations=[],
+                static_scores={},
+                inference_scores={},
+                final_verdict=False,
+            )
+            score = apply_inference_analysis(
+                merged_df,
+                review_obj,
+                review_text,
+                business_description,
+                initial_score=initial_score,
+                penalty_per_violation=penalty_per_violation,
+            )
+            review_obj.score = score
+
+            if is_trustworthy:
+                review_obj.score += 0.5
+            else:
+                review_obj.score -= 0.5
+                review_obj.violations.append("untrustworthy_user")
+
+            apply_static_analysis(review_obj, review_text)
+            review_obj.score = max(review_obj.score, 0)
+            review_obj.final_verdict = review_obj.score < final_threshold
+
+            all_review_objects.append(review_obj)
+
+            print(f"\n--- Review {idx + 1} (User: {user_id}) ---\n{review_obj}")
+
+    return all_review_objects
 
 
 def main():
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-    json_path = os.path.join(project_root, "data", "sample_data.json")
+    base_path = os.path.join(os.path.dirname(__file__), "../../sampleData/")
+    user_reviews_file = os.path.join(base_path, "user_past_reviews.jsonl")
+    gmap_locations_file = os.path.join(base_path, "unique_gmap_ids.jsonl")
 
-    df = pd.read_json(json_path, lines=True)
-
-    reviews = df.to_dict(orient="records")
-
-    for review in reviews:
-        result = score_review(
-           review_text=review["text"],
-            business_description=review["business_description"],
-        )
-        print(result)
-
-    sample_reviews = [
-        {
-            "review_text": "Buy cheap watches at www.spam.com! Never been there but heard it's good.",
-            "business_description": "Italian restaurant serving pizza and pasta.",
-        },
-        {
-            "review_text": "The pasta was delicious and service was excellent.",
-            "business_description": "Italian restaurant serving pizza and pasta.",
-        },
-        {
-            "review_text": "I was not there actually.",
-            "business_description": "Local art gallery in the city center.",
-        },
-        {
-            "review_text": "WHY DID THEY DO THIS TO ME!!!",
-            "business_description": "Tech startup specializing in AI solutions.",
-        },
-        {
-            "review_text": "The sun was very bright.",
-            "business_description": "Beachside resort with spa and dining options.",
-        },
-        {
-            "review_text": "This deal is too good to miss! Everyone should grab one.",
-            "business_description": "Electronics store in downtown."
-        },
-        {
-            "review_text": "Exclusive savings available today on all products!",
-            "business_description": "Online fashion retailer."
-        },
-        {
-            "review_text": "Discover our newest collection online, highly recommended!",
-            "business_description": "Home decor startup."
-        },
-        {
-            "review_text": "Visit our brand for special goodies this season.",
-            "business_description": "Tech gadget company."
-        },
-        {
-            "review_text": "A friend told me this place has the best sushi.",
-            "business_description": "Japanese restaurant."
-        },
-        {
-            "review_text": "People say the gallery is worth a visit, I haven’t seen it myself.",
-            "business_description": "Local art gallery."
-        },
-        {
-            "review_text": "The construction around the area is a nightmare.",
-            "business_description": "Cafe near city center."
-        },
-        {
-            "review_text": "The neighborhood is noisy and chaotic at night.",
-            "business_description": "Hotel with spa services."
-        },
-        {
-            "review_text": "Completely frustrated with how they handled my order!",
-            "business_description": "Local bakery."
-        },
-        {
-            "review_text": "Everything went wrong today, can’t believe this service.",
-            "business_description": "Electronics store."
-        }
-    ]
-
-    for r in sample_reviews:
-        result = score_review(r["review_text"], r["business_description"])
-        print(result)
+    user_reviews_df, gmap_locations_df = load_jsonl_data(
+        user_reviews_file, gmap_locations_file
+    )
+    merged_df = pd.merge(user_reviews_df, gmap_locations_df, on="gmap_id", how="inner")
+    run_review_pipeline(merged_df)
 
 
 if __name__ == "__main__":

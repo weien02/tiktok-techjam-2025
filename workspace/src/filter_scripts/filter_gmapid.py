@@ -3,8 +3,10 @@ import json
 from pathlib import Path
 
 # ====== CONFIG ======
-reviews_path = Path("../../sampleData/user_past_reviews.jsonl") # file with user reviews + gmap_id
-business_path = Path("../../dataSource/meta-Utah.json") # file with business info
+reviews_path = Path(
+    "../../sampleData/user_past_reviews.jsonl"
+)  # file with user reviews + gmap_id
+business_path = Path("../../sampleData/meta-Utah.json")  # file with business info
 out_path = Path("../../sampleData/unique_gmap_ids.jsonl")  # output
 # ====================
 
@@ -42,13 +44,15 @@ with business_path.open("r", encoding="utf-8") as fin:
 
         gid = biz.get("gmap_id")
         if gid in unique_gmap_ids:
-            filtered_records.append({
-                "gmap_id": gid,
-                "name": biz.get("name"),
-                "address": biz.get("address"),
-                "description": biz.get("description"),
-                "category": biz.get("category"),
-            })
+            filtered_records.append(
+                {
+                    "gmap_id": gid,
+                    "name": biz.get("name"),
+                    "address": biz.get("address"),
+                    "description": biz.get("description"),
+                    "category": biz.get("category"),
+                }
+            )
 
 # Step 3: Write output JSONL
 with out_path.open("w", encoding="utf-8") as fout:

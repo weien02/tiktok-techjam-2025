@@ -9,31 +9,74 @@ inference_model = pipeline(
     "zero-shot-classification",
     # model="gtfintechlab/SubjECTiveQA-RELEVANT",
     model="facebook/bart-large-mnli",
-    device=device
+    device=device,
 )
 
-def inference_analysis(review_text, business_description):
-    input_text = f"Business: {business_description}\nReview: {review_text}"
 
-    # Check relevance
-    relevance_result = inference_model(
-        input_text,
-        candidate_labels=["relevant", "irrelevant"],
-        hypothesis_template="This review is {}."
+def inference_analysis(review_text, business_description, threshold=0.6):
+
+    input_text = (
+        f"Business Description: {business_description}\nUser Review: {review_text}"
     )
-    top_relevance_label = relevance_result["labels"][0]
-    relevance_confidence = relevance_result["scores"][0]
 
-    # Check policy violation if irrelevant
-    policy_result = {}
-    if top_relevance_label == "irrelevant":
-        policy_result_raw = inference_model(
-            input_text,
-            candidate_labels=list(policy_keywords.keys()),
-            hypothesis_template="This review is an example of {}."
-        )
-        policy_result = {
-            label: -score for label, score in zip(policy_result_raw["labels"], policy_result_raw["scores"])
-        }
+    # Reframed labels for more targeted classification
+    behavior_labels = ["spam", "advertisement", "fake review", "rant", "genuine"]
 
-    return top_relevance_label, relevance_confidence, policy_result
+    classification = inference_model(
+        input_text,
+        candidate_labels=behavior_labels,
+        hypothesis_template="This review is {}.",
+        multi_label=True,
+    )
+
+    # Filter labels by threshold
+    filtered_labels = [
+        (label, score)
+        for label, score in zip(classification["labels"], classification["scores"])
+        if score >= threshold
+    ]
+
+    return {
+        "filtered_labels": [label for label, _ in filtered_labels],
+        "filtered_scores": {label: score for label, score in filtered_labels},
+        "all_scores": dict(zip(classification["labels"], classification["scores"])),
+    }
+
+
+def user_trustworthiness_analysis(user_id, user_reviews, threshold=0.6):
+    """
+    user_reviews: list of review texts by the user
+    Returns trustworthiness labels and scores similar to inference_analysis.
+    """
+
+    reviews_text = "\n".join(user_reviews[:10])
+
+    input_text = (
+        f"User ID: {user_id}\n"
+        f"User Reviews:\n{reviews_text}\n\n"
+        "Based on these reviews, classify the user as trustworthy or untrustworthy."
+    )
+
+    behavior_labels = ["trustworthy user", "untrustworthy user"]
+
+    classification = inference_model(
+        input_text,
+        candidate_labels=behavior_labels,
+        hypothesis_template="This user is {}.",
+        multi_label=False,
+    )
+
+    filtered_labels = [
+        (label, score)
+        for label, score in zip(classification["labels"], classification["scores"])
+        if score >= threshold
+    ]
+
+    if not filtered_labels:
+        filtered_labels = [(classification["labels"][0], classification["scores"][0])]
+
+    return {
+        "filtered_labels": [label for label, _ in filtered_labels],
+        "filtered_scores": {label: score for label, score in filtered_labels},
+        "all_scores": dict(zip(classification["labels"], classification["scores"])),
+    }
