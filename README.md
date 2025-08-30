@@ -1,68 +1,78 @@
-# Set Up
+# Google Location Reviews Filtering and Classification
 
-## Directory Structure
+## Project Overview
 
-```bash
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-├── workspace/
-│   ├── test_setup.py
-│   ├── src/
-│   ├── data/
-└── ~/.cache/huggingface/        # Hugging Face model & dataset cache on host
-```
+This project focuses on detecting **relevant** vs **irrelevant** Google location reviews, particularly those originating from the **Utah** region of the dataset provided by [McAuley Lab – Google Local Reviews](https://mcauleylab.ucsd.edu/public_datasets/gdrive/googlelocal/).
 
-## Building and Running Docker
+Our goal was to develop a lightweight, scalable approach to identifying location-relevant reviews and filtering out spam, advertisements, off-topic content, and policy-violating entries using a mix of manual annotation, feature heuristics, and NLP classification.
 
-Make sure you have Docker Desktop installed and open.
+---
 
-1. Build Docker Image
+## 1. Data Exploration & Manual Labeling
 
-```bash
-docker-compose build
-```
+- We began by sampling **200 reviews** from the Utah dataset.
+> This annotation served as the **ground truth** for evaluating automated filtering techniques.
 
-2. Run Docker Container
+---
 
-```bash
-docker-compose run --rm review-analyzer ## --rm flag removes the container when it stops
-```
+## 2. Preprocessing & Feature Engineering
 
-To stop the container `ctrl + D`
+To ensure clean and structured input, we applied the following steps:
 
-3. Test Set Up
+- **Text Cleaning**:
+  - Removed HTML tags, special characters, and duplicates.
+- **Metadata Retention**:
+  - Preserved timestamps and `gmap_id` to enrich context.
+- **User Behavior Analysis**:
+  - Retrieved up to **20 additional reviews per user** from the labeled set to detect suspicious review patterns (e.g., copy-pasting, excessive promotion).
+- **Business Metadata Integration**:
+  - Mapped `gmap_id` to business attributes (e.g., category, description) to align review content with business type.
+- **Keyword Heuristics**:
+  - Identified indicative terms such as "promo code", "CEO of", or "DM for info" to flag potentially irrelevant content.
 
-```bash
-python test_setup.py
-```
+---
 
-You should see something similar to below (if you have GPU):
+## 3. Review Classification Pipeline
 
-```powershell
-=== Python & Library Check ===
-Python version: 3.11.0rc1 (main, Aug 12 2022, 10:02:14) [GCC 11.2.0]
-numpy version: 1.26.4 (expected 1.26.4)
-pandas version: 2.1.1 (expected 2.1.1)
-scikit-learn is not installed!
-transformers version: 4.35.0 (expected 4.35.0)
-huggingface_hub version: 0.16.4 (expected 0.16.4)
-datasets version: 2.13.1 (expected 2.13.1)
+We employed a **hybrid pipeline** combining traditional string matching with semantic classification to automate review filtering:
 
-=== GPU Check ===
-GPU available: True
-GPU name: NVIDIA GeForce RTX 4060 Laptop GPU
-CUDA version: 12.8
+- **Cosine Similarity**:
+  - Compared the semantic similarity between the review and the business description using embedding-based techniques.
+- **Basic Heuristics**:
+  - Flagged overly short reviews using string length thresholds.
+- **Zero-Shot Classification via LLM**:
+  - Used a pre-trained model from Hugging Face:
+    ```python
+    from transformers import pipeline
 
-=== Hugging Face Model Test ===
-Loading Hugging Face model 'distilbert-base-uncased-finetuned-sst-2-english' on cuda...
-Downloading tokenizer_config.json: 100%|██████████████████████████████████████████████████████████████████████████████████████████| 48.0/48.0 [00:00<00:00, 383kB/s]
-Downloading config.json: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 629/629 [00:00<00:00, 5.05MB/s]
-Downloading vocab.txt: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████| 232k/232k [00:00<00:00, 16.1MB/s]
-/usr/local/lib/python3.11/dist-packages/transformers/utils/generic.py:309: FutureWarning: `torch.utils._pytree._register_pytree_node` is deprecated. Please use `torch.utils._pytree.register_pytree_node` instead.
-  _torch_pytree._register_pytree_node(
-Downloading model.safetensors: 100%|█████████████████████████████████████████████████████████████████████████████████████████████| 268M/268M [00:07<00:00, 36.9MB/s]
-Model 'distilbert-base-uncased-finetuned-sst-2-english' loaded successfully.
-Test inference successful. Output logits: tensor([[ 1.7403, -1.5810]], device='cuda:0', grad_fn=<AddmmBackward0>)
-```
+    inference_model = pipeline(
+        "zero-shot-classification",
+        model="facebook/bart-large-mnli",
+        device=device,
+    )
+    ```
+  - The model was asked to classify reviews as **["spam", "advertisement", "fake review", "rant", "genuine"]** based on the predefined criteria.
 
+---
+
+## 4. Iterative Refinement
+
+Based on the classification results, we refined the approach:
+
+- Adjusted **similarity thresholds** and **string length filters**.
+- Modified LLM prompts to reduce ambiguity and false positives.
+- Added more labeled examples and **pseudo-labeled reviews** to improve evaluation and confidence.
+
+
+---
+
+## 5. Scaling to the Full Dataset
+
+While the pipeline was designed for large-scale inference, we were unable to apply it to the entire Utah dataset due to time constraints.
+
+> Future work includes:
+- Running the pipeline across the full dataset.
+- Automating feedback loops using active learning.
+- Building an interface to review flagged outputs.
+
+---
