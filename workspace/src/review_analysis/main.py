@@ -135,109 +135,6 @@ def run_review_pipeline(
     return all_review_objects
 
 
-data = [
-    # User 1 - spammy and advertisement reviews, off-topic
-    {
-        "user_id": "user1",
-        "name_x": "User One",
-        "review": "Buy cheap products at http://spamlink.com now!!!",
-        "rating": 1,
-        "time": "2025-08-01",
-        "gmap_id": "loc1",
-        "name_y": "Cool Cafe",
-        "address": "123 Main St",
-        "description": "A cozy cafe serving coffee and pastries.",
-        "category": ["Cafe", "Coffee Shop"],
-    },
-    {
-        "user_id": "user1",
-        "name_x": "User One",
-        "review": "Visit www.advertisehere.com for great deals on everything!",
-        "rating": 1,
-        "time": "2025-08-02",
-        "gmap_id": "loc2",
-        "name_y": "Tech Store",
-        "address": "456 Market St",
-        "description": "Retail store for electronics and gadgets.",
-        "category": ["Electronics", "Retail"],
-    },
-    {
-        "user_id": "user1",
-        "name_x": "User One",
-        "review": "This review has nothing to do with the place, just random ranting about politics.",
-        "rating": 2,
-        "time": "2025-08-03",
-        "gmap_id": "loc3",
-        "name_y": "Bookstore",
-        "address": "789 Elm St",
-        "description": "Local bookstore with a great selection.",
-        "category": ["Bookstore", "Retail"],
-    },
-    # User 2 - non-visitor type review
-    {
-        "user_id": "user2",
-        "name_x": "User Two",
-        "review": "I heard this place is terrible and has bad service.",
-        "rating": 1,
-        "time": "2025-08-04",
-        "gmap_id": "loc4",
-        "name_y": "Italian Restaurant",
-        "address": "321 Oak St",
-        "description": "Authentic Italian cuisine with cozy atmosphere.",
-        "category": ["Restaurant", "Italian"],
-    },
-    # User 3 - good genuine user with multiple bad reviews
-    {
-        "user_id": "user3",
-        "name_x": "User Three",
-        "review": "Spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam",
-        "rating": 1,
-        "time": "2025-08-05",
-        "gmap_id": "loc5",
-        "name_y": "Gym Center",
-        "address": "654 Pine St",
-        "description": "Gym with modern equipment and trainers.",
-        "category": ["Gym", "Fitness"],
-    },
-    {
-        "user_id": "user3",
-        "name_x": "User Three",
-        "review": "Visit www.fakeads.com now for great discounts!!!",
-        "rating": 1,
-        "time": "2025-08-06",
-        "gmap_id": "loc6",
-        "name_y": "Hair Salon",
-        "address": "987 Maple Ave",
-        "description": "Professional haircuts and styling.",
-        "category": ["Salon", "Beauty"],
-    },
-    {
-        "user_id": "user3",
-        "name_x": "User Three",
-        "review": "I never went to this place but heard they are bad.",
-        "rating": 1,
-        "time": "2025-08-07",
-        "gmap_id": "loc7",
-        "name_y": "Pet Store",
-        "address": "159 Cedar Blvd",
-        "description": "Pet supplies and grooming services.",
-        "category": ["Pet Store", "Retail"],
-    },
-    {
-        "user_id": "user3",
-        "name_x": "User Three",
-        "review": "Totally unrelated content about movies and TV shows.",
-        "rating": 2,
-        "time": "2025-08-08",
-        "gmap_id": "loc8",
-        "name_y": "Movie Theater",
-        "address": "753 Birch Rd",
-        "description": "Local movie theater with latest releases.",
-        "category": ["Entertainment", "Cinema"],
-    },
-]
-
-
 def main():
     base_path = os.path.join(os.path.dirname(__file__), "../../sampleData/")
     user_reviews_file = os.path.join(base_path, "user_past_reviews.jsonl")
@@ -246,10 +143,7 @@ def main():
     user_reviews_df, gmap_locations_df = load_jsonl_data(
         user_reviews_file, gmap_locations_file
     )
-    # merged_df = pd.merge(user_reviews_df, gmap_locations_df, on="gmap_id", how="inner")
-    # run_review_pipeline(merged_df)
-    merged_df = pd.DataFrame(data)
-    print(merged_df)
+    merged_df = pd.merge(user_reviews_df, gmap_locations_df, on="gmap_id", how="inner")
     run_review_pipeline(merged_df)
 
 
